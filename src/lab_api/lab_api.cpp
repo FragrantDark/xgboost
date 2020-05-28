@@ -1,6 +1,8 @@
 //
 // Created by zhangqi on 2020-05-28.
 //
+#include <vector>
+
 #include <lab_api.h>
 #include <xgboost/c_api.h>
 
@@ -17,10 +19,19 @@ namespace dce_lab {
 int SampleVec2SimpleDMatrix(const sample_vec_t& svec, xgboost::data::SimpleDMatrix& sdmtx, int n_col) {
 
     int non_zero_cnt = 0;
+
     // 1. SparsePage
     xgboost::SparsePage page;
-    // todo page.offset
-    // todo page.data
+
+    std::vector<bst_row_t> offset_vec;
+    std::vector<Entry> data_vec;
+    // todo offset_vec
+    // todo data_vec
+    // todo update non_zero_cnt
+
+    page.offset = xgboost::HostDeviceVector(offset_vec);
+    page.data = xgboost::HostDeviceVector(data_vec);
+
     sdmtx.SetSparsePage(page);
 
     // 2. MetaInfo
