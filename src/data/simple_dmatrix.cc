@@ -16,6 +16,13 @@ MetaInfo& SimpleDMatrix::Info() { return info_; }
 
 const MetaInfo& SimpleDMatrix::Info() const { return info_; }
 
+void SimpleDMatrix::SetSparsePage(SparsePage&& page) {
+    sparse_page_.offset = (HostDeviceVector<bst_row_t>&&)page.offset;
+    sparse_page_.data = (HostDeviceVector<Entry>&&)page.data;
+}
+
+const SparsePage& SimpleDMatrix::GetSparsePage() const { return sparse_page_; }
+
 DMatrix* SimpleDMatrix::Slice(common::Span<int32_t const> ridxs) {
   auto out = new SimpleDMatrix;
   SparsePage& out_page = out->sparse_page_;
