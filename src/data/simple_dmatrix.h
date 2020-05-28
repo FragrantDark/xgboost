@@ -31,6 +31,7 @@ class SimpleDMatrix : public DMatrix {
   MetaInfo& Info() override;
 
   const MetaInfo& Info() const override;
+  void SetMetaInfo(const MetaInfo& info) { info_ = info; }
 
   bool SingleColBlock() const override { return true; }
   DMatrix* Slice(common::Span<int32_t const> ridxs) override;

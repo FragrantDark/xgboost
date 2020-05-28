@@ -1,25 +1,47 @@
 //
 // Created by zhangqi on 2020-05-28.
 //
-#include <lab-api.h>
+#include <lab_api.h>
 #include <xgboost/c_api.h>
 
 #include "../data/simple_dmatrix.h"
 
 namespace dce_lab {
 
-int SampleVec2SimpleDMatrix(const sample_vec_t& svec, xgboost::data::SimpleDMatrix& sdmtx) {
-    // TODO
+/**
+ * convert sample_vec_t instance to SimpleDMatrix
+ * @param svec
+ * @param sdmtx
+ * @return  0 if success, <0 else
+ */
+int SampleVec2SimpleDMatrix(const sample_vec_t& svec, xgboost::data::SimpleDMatrix& sdmtx, int n_col) {
+
+    int non_zero_cnt = 0;
+    // 1. SparsePage
+    xgboost::SparsePage page;
+    // todo page.offset
+    // todo page.data
+    sdmtx.SetSparsePage(page);
+
+    // 2. MetaInfo
+    xgboost::MetaInfo info;
+    info.num_row_ = svec.size();
+    info.num_col_ = n_col;
+    info.num_nonzero_ = non_zero_cnt;
+    // todo info.labels_
+    sdmtx.SetMetaInfo(info);
+
+    return 0;
 }
 
 int XGB::Train(const dce_lab::sample_vec_t &train, const dce_lab::sample_vec_t &test,
                const dce_lab::param_dic_t &param_dict) {
 
     xgboost::data::SimpleDMatrix dtrain;
-    SampleVec2SimpleDMatrix(train, dtrain);
+    SampleVec2SimpleDMatrix(train, dtrain, n_col_);
 
     xgboost::data::SimpleDMatrix dtest;
-    SampleVec2SimpleDMatrix(test, dtest);
+    SampleVec2SimpleDMatrix(test, dtest, n_col_);
 
     DMatrixHandle eval_dmats[2] = {dtrain, dtest};
 
