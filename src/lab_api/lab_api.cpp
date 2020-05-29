@@ -15,19 +15,30 @@ namespace dce_lab {
  * @param svec
  * @param sdmtx
  * @return  0 if success, <0 else
+ *
  */
 int SampleVec2SimpleDMatrix(const sample_vec_t& svec, xgboost::data::SimpleDMatrix& sdmtx, int n_col) {
 
     int non_zero_cnt = 0;
+    std::vector<bst_row_t> offset_vec;
+    std::vector<xgboost::Entry> data_vec;
+    std::vector<bst_float> labels_vec;
+    std::vector<bst_float> weights_vec;
+
+    offset_vec.push_back(0);
+    for (auto spl=svec.cbegin(); spl!=svec.cend(); ++spl) {
+        labels_vec.emplace_back(spl->label);
+        weights_vec.emplace_back(spl->weight);
+        non_zero_cnt += spl->features.size();
+
+        for (auto ety=spl->features.cbegin(); ety!=spl->features.cend(); ++ety) {
+            data_vec.emplace_back(ety->first, ety->second);
+        }
+        offset_vec.emplace_back(data_vec.size());
+    }
 
     // 1. SparsePage
     xgboost::SparsePage page;
-
-    std::vector<bst_row_t> offset_vec;
-    std::vector<Entry> data_vec;
-    // todo offset_vec
-    // todo data_vec
-    // todo update non_zero_cnt
 
     page.offset = xgboost::HostDeviceVector(offset_vec);
     page.data = xgboost::HostDeviceVector(data_vec);
@@ -36,10 +47,13 @@ int SampleVec2SimpleDMatrix(const sample_vec_t& svec, xgboost::data::SimpleDMatr
 
     // 2. MetaInfo
     xgboost::MetaInfo info;
+
     info.num_row_ = svec.size();
     info.num_col_ = n_col;
     info.num_nonzero_ = non_zero_cnt;
-    // todo info.labels_
+    info.labels_ = xgboost::HostDeviceVector(labels_vec);
+    info.weights_ = xgboost::HostDeviceVector(weights_vec);
+
     sdmtx.SetMetaInfo(info);
 
     return 0;
