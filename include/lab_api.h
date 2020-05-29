@@ -33,7 +33,7 @@ using pred_res_t = std::vector<float>;
 class XGB {
 public:
     XGB(int n_col) : n_col_(n_col) {}
-    ~XGB() { safe_xgboost(XGBoosterFree(booster)); }
+    ~XGB();
 
     int Train(const sample_vec_t& train, const sample_vec_t& test, const param_dic_t& param_dict);
 
