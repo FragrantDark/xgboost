@@ -38,36 +38,48 @@ template<typename T> std::string v2s(const std::vector<T>& v) {
  * @return  0 if success, <0 else
  *
  */
-void TestDMatrix(xgboost::data::SimpleDMatrix& dmtx) {
-    const xgboost::MetaInfo& info = dmtx.Info();
-    const xgboost::SparsePage& spage = dmtx.GetSparsePage();
-
+void TestDMatrix(const xgboost::MetaInfo& info, const xgboost::SparsePage& spage) {
     std::cerr << "MetaInfo:" << std::endl
-         << "\tnum_row_\t" << info.num_row_ << std::endl
-         << "\tnum_col_\t" << info.num_col_ << std::endl
-         << "\tnum_nonzero_\t" << info.num_nonzero_ << std::endl
-         << "\tlabels_\t" << info.labels_.HostVector().size() << "\t" << v2s(info.labels_.HostVector()) << std::endl
-         << "\tgroup_ptr_\t" << info.group_ptr_.size() << "\t" << v2s(info.group_ptr_) << std::endl
-         << "\tweights_\t" << info.weights_.HostVector().size() << "\t" << v2s(info.weights_.HostVector()) << std::endl
-         << "\tbase_margin_\t" << info.base_margin_.HostVector().size() << "\t" << v2s(info.base_margin_.HostVector()) << std::endl
-         << "\tlabels_lower_bound_\t" << info.labels_lower_bound_.HostVector().size() << "\t" << v2s(info.labels_lower_bound_.HostVector()) << std::endl
-         << "\tlabels_upper_bound_\t" << info.labels_upper_bound_.HostVector().size() << "\t" << v2s(info.labels_upper_bound_.HostVector()) << std::endl
-         << std::endl;
+              << "\tnum_row_\t" << info.num_row_ << std::endl
+              << "\tnum_col_\t" << info.num_col_ << std::endl
+              << "\tnum_nonzero_\t" << info.num_nonzero_ << std::endl
+              << "\tlabels_\t" << info.labels_.HostVector().size() << "\t" << v2s(info.labels_.HostVector()) << std::endl
+              << "\tgroup_ptr_\t" << info.group_ptr_.size() << "\t" << v2s(info.group_ptr_) << std::endl
+              << "\tweights_\t" << info.weights_.HostVector().size() << "\t" << v2s(info.weights_.HostVector()) << std::endl
+              << "\tbase_margin_\t" << info.base_margin_.HostVector().size() << "\t" << v2s(info.base_margin_.HostVector()) << std::endl
+              << "\tlabels_lower_bound_\t" << info.labels_lower_bound_.HostVector().size() << "\t" << v2s(info.labels_lower_bound_.HostVector()) << std::endl
+              << "\tlabels_upper_bound_\t" << info.labels_upper_bound_.HostVector().size() << "\t" << v2s(info.labels_upper_bound_.HostVector()) << std::endl
+              << std::endl;
 
     std::cerr << "SparsePage:" << std::endl
-         << "\toffset\t" << spage.offset.HostVector().size() << "\t" << v2s(spage.offset.HostVector()) << std::endl
-         << "\tdata\t" << spage.data.HostVector().size() << "\t";
+              << "\toffset\t" << spage.offset.HostVector().size() << "\t" << v2s(spage.offset.HostVector()) << std::endl
+              << "\tdata\t" << spage.data.HostVector().size() << "\t";
 
     const std::vector<xgboost::Entry>& v = spage.data.HostVector();
     for (auto it=v.cbegin(); it!=v.cend(); ++it) {
         std::cerr << it->index << ":" << it->fvalue << ",";
     }
-    std::cerr << std::endl << std::endl;
+    std::cerr << std::endl;
+
+    std::cerr << "\tbase_rowid\t" << spage.base_rowid << std::endl << std::endl;
+}
+
+
+void TestDMatrix(xgboost::data::SimpleDMatrix& dmtx) {
+    const xgboost::MetaInfo& info = dmtx.Info();
+    const xgboost::SparsePage& spage = dmtx.GetSparsePage();
+
+    TestDMatrix(info, spage);
+}
+
+void TestDMatrix(DMatrixHandle dmtx) {
+    const xgboost::MetaInfo& info = ((xgboost::data::SimpleDMatrix*)dmtx)->Info();
+    const xgboost::SparsePage& spage = ((xgboost::data::SimpleDMatrix*)dmtx)->GetSparsePage();
+
+    TestDMatrix(info, spage);
 }
 
 int SampleVec2SimpleDMatrix(const sample_vec_t& svec, xgboost::data::SimpleDMatrix& sdmtx, int n_col) {
-
-    std::cerr << "SampleVec2SimpleDMatrix(,," << n_col << ")" << std::endl;
 
     int non_zero_cnt = 0;
     std::vector<xgboost::bst_row_t> offset_vec;
@@ -92,6 +104,7 @@ int SampleVec2SimpleDMatrix(const sample_vec_t& svec, xgboost::data::SimpleDMatr
 
     page.offset = xgboost::HostDeviceVector<xgboost::bst_row_t>(offset_vec);
     page.data = xgboost::HostDeviceVector<xgboost::Entry>(data_vec);
+    page.base_rowid = 0;
 
     sdmtx.SetSparsePage((xgboost::SparsePage&&)page);
 
@@ -120,11 +133,10 @@ int XGB::Train(const dce_lab::sample_vec_t &train, const dce_lab::sample_vec_t &
     xgboost::data::SimpleDMatrix dtest;
     SampleVec2SimpleDMatrix(test, dtest, n_col_);
 
-    // todo
-    std::cerr << "Test dtest: " << std::endl;
-    TestDMatrix(dtest);
+    DMatrixHandle dtrain1 = new std::shared_ptr<xgboost::DMatrix>(&dtrain);
+    DMatrixHandle dtest1 = new std::shared_ptr<xgboost::DMatrix>(&dtest);
 
-    DMatrixHandle eval_dmats[2] = {&dtrain, &dtest};
+    DMatrixHandle eval_dmats[2] = {dtrain1, dtest1};
 
     safe_xgboost(XGBoosterCreate(eval_dmats, 2, &booster));
 
@@ -139,18 +151,17 @@ int XGB::Train(const dce_lab::sample_vec_t &train, const dce_lab::sample_vec_t &
     const char* eval_names[2] = {"train", "test"};
     const char* eval_result = NULL;
     for (int i = 0; i < n_trees; ++i) {
-        safe_xgboost(XGBoosterUpdateOneIter(booster, i, &dtrain));
+        //safe_xgboost(XGBoosterUpdateOneIter(booster, i, &dtrain));
+        safe_xgboost(XGBoosterUpdateOneIter(booster, i, dtrain1));
         safe_xgboost(XGBoosterEvalOneIter(booster, i, eval_dmats, eval_names, 2, &eval_result));
         printf("%s\n", eval_result);
     }
-
-    safe_xgboost(XGDMatrixFree(&dtrain));
-    safe_xgboost(XGDMatrixFree(&dtest));
 
     return 0;
 }
 
 int XGB::Predict(const dce_lab::sample_vec_t &test, dce_lab::pred_res_t &result) const {
+
 
     bst_ulong out_len = 0;
     const float* out_result = NULL;
@@ -158,14 +169,14 @@ int XGB::Predict(const dce_lab::sample_vec_t &test, dce_lab::pred_res_t &result)
     xgboost::data::SimpleDMatrix dtest;
     SampleVec2SimpleDMatrix(test, dtest, n_col_);
 
-    safe_xgboost(XGBoosterPredict(booster, &dtest, 0, 0, 0, &out_len, &out_result));
+    DMatrixHandle dtest1 = new std::shared_ptr<xgboost::DMatrix>(&dtest);
+
+    safe_xgboost(XGBoosterPredict(booster, dtest1, 0, 0, 0, &out_len, &out_result));
 
     result.clear();
     for (int i=0; i<out_len; ++i) {
         result.emplace_back(out_result[i]);
     }
-
-    safe_xgboost(XGDMatrixFree(&dtest));
 
     return 0;
 }
