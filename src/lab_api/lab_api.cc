@@ -115,7 +115,7 @@ int SampleVec2SimpleDMatrix(const sample_vec_t& svec, xgboost::data::SimpleDMatr
     info.num_col_ = n_col;
     info.num_nonzero_ = non_zero_cnt;
     info.labels_ = xgboost::HostDeviceVector<xgboost::bst_float>(labels_vec);
-    //info.weights_ = xgboost::HostDeviceVector<xgboost::bst_float>(weights_vec);   //todo
+    info.weights_ = xgboost::HostDeviceVector<xgboost::bst_float>(weights_vec);
 
     sdmtx.SetMetaInfo(info);
 
