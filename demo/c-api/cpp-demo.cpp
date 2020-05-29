@@ -4,51 +4,81 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <fstream>
+#include <unordered_map>
 
+#include <lab_api.h>
 
-#include "../../src/data/simple_dmatrix.h"
-#include "../../include/xgboost/data.h"
-
-
-using namespace xgboost;    // NOLINT
 using namespace std;
+using namespace dce_lab;
 
-template<typename T> string v2s(const vector<T>& v) {
-    stringstream ss;
-    for (auto it=v.cbegin(); it!=v.cend(); ++it) {
-        ss << (*it) << ",";
+void File2SampleVec(const char* fname, sample_vec_t& svec) {
+    //cerr << "File2SampleVec()" << endl;
+    svec.clear();
+
+    ifstream ifs(fname);
+    string line;
+    while (getline(ifs, line)) {
+        float lbl = float(line[0] - '0');
+        float wgt = 1.0;
+        svec.emplace_back(lbl, wgt);
+
+        //cerr << line << endl;
+
+        int bpos = 2;
+        int epos = line.find_first_of(' ', bpos);
+        char c;
+        int idx;
+        float fval;
+        while (epos != string::npos) {
+            //int mpos = line.find_first_of(':', bpos);
+            stringstream ss;
+            ss << line.substr(bpos, epos - bpos);
+            ss >> idx >> c >> fval;
+
+            //cerr << "Feature: [" << idx << "|" << c << "|" << fval << "]" << endl;
+            svec.back().AddFeature(idx, fval);
+
+            bpos = epos + 1;
+            epos = line.find_first_of(' ', bpos);
+        }
+        // last feature
+        stringstream ss;
+        ss << line.substr(bpos);
+        ss >> idx >> c >> fval;
+
+        //cerr << "Feature: [" << idx << "|" << c << "|" << fval << "]" << endl;
+        svec.back().AddFeature(idx, fval);
     }
-    string str;
-    ss >> str;
-    return str;
+
+    ifs.close();
 }
 
 int main(int argc, char** argv) {
-    // added by zhangqi01
-    xgboost::DMatrix* dmat = xgboost::DMatrix::Load("../data/agaricus.txt.test", true, false);
-    const xgboost::MetaInfo& info = ((xgboost::data::SimpleDMatrix*)dmat)->Info();
-    const xgboost::SparsePage& spage = ((xgboost::data::SimpleDMatrix*)dmat)->GetSparsePage();
+    sample_vec_t train;
+    sample_vec_t test;
+    File2SampleVec("../data/agaricus.txt.train", train);
+    File2SampleVec("../data/agaricus.txt.test", test);
 
-    cerr << "MetaInfo:" << endl
-        << "\tnum_row_\t" << info.num_row_ << endl
-        << "\tnum_col_\t" << info.num_col_ << endl
-        << "\tnum_nonzero_\t" << info.num_nonzero_ << endl
-        << "\tlabels_\t" << info.labels_.HostVector().size() << "\t" << v2s(info.labels_.HostVector()) << endl
-        << "\tgroup_ptr_\t" << info.group_ptr_.size() << "\t" << v2s(info.group_ptr_) << endl
-        << "\tweights_\t" << info.weights_.HostVector().size() << "\t" << v2s(info.weights_.HostVector()) << endl
-        << "\tbase_margin_\t" << info.base_margin_.HostVector().size() << "\t" << v2s(info.base_margin_.HostVector()) << endl
-        << "\tlabels_lower_bound_\t" << info.labels_lower_bound_.HostVector().size() << "\t" << v2s(info.labels_lower_bound_.HostVector()) << endl
-        << "\tlabels_upper_bound_\t" << info.labels_upper_bound_.HostVector().size() << "\t" << v2s(info.labels_upper_bound_.HostVector()) << endl
-        << endl;
+    unordered_map<string, string> pdic;
+    pdic["tree_method"] = "hist";
+    pdic["gpu_id"] = "-1";
+    pdic["objective"] = "binary:logistic";
+    pdic["min_child_weight"] = "1";
+    pdic["gamma"] = "0.1";
+    pdic["max_depth"] = "3";
+    pdic["verbosity"] = "0";
 
-    cerr << "SparsePage:" << endl
-        << "\toffset\t" << spage.offset.HostVector().size() << "\t" << v2s(spage.offset.HostVector()) << endl
-        << "\tdata\t" << spage.data.HostVector().size() << "\t";
+    XGB xgb(127);
+    xgb.Train(train, test, pdic);
 
-    const vector<Entry>& v = spage.data.HostVector();
-    for (auto it=v.cbegin(); it!=v.cend(); ++it) {
-        cerr << it->index << ":" << it->fvalue << ",";
+    pred_res_t result;
+    xgb.Predict(test, result);
+
+    int n_print = 10;
+    for (int i=0; i< n_print; ++i) {
+        cout << "[" << i << "]\t" << test[i].label << "\t" << result[i] << endl;
     }
-    cerr << endl << endl;
 
+    return 0;
 }

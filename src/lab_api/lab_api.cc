@@ -2,6 +2,9 @@
 // Created by zhangqi on 2020-05-28.
 //
 #include <vector>
+#include <iostream>
+#include <string>
+#include <sstream>
 
 #include <lab_api.h>
 #include <xgboost/c_api.h>
@@ -18,6 +21,16 @@ if (err != 0) {                                                         \
 
 namespace dce_lab {
 
+template<typename T> std::string v2s(const std::vector<T>& v) {
+    std::stringstream ss;
+    for (auto it=v.cbegin(); it!=v.cend(); ++it) {
+        ss << (*it) << ",";
+    }
+    std::string str;
+    ss >> str;
+    return str;
+}
+
 /**
  * convert sample_vec_t instance to SimpleDMatrix
  * @param svec
@@ -25,7 +38,36 @@ namespace dce_lab {
  * @return  0 if success, <0 else
  *
  */
+void TestDMatrix(xgboost::data::SimpleDMatrix& dmtx) {
+    const xgboost::MetaInfo& info = dmtx.Info();
+    const xgboost::SparsePage& spage = dmtx.GetSparsePage();
+
+    std::cerr << "MetaInfo:" << std::endl
+         << "\tnum_row_\t" << info.num_row_ << std::endl
+         << "\tnum_col_\t" << info.num_col_ << std::endl
+         << "\tnum_nonzero_\t" << info.num_nonzero_ << std::endl
+         << "\tlabels_\t" << info.labels_.HostVector().size() << "\t" << v2s(info.labels_.HostVector()) << std::endl
+         << "\tgroup_ptr_\t" << info.group_ptr_.size() << "\t" << v2s(info.group_ptr_) << std::endl
+         << "\tweights_\t" << info.weights_.HostVector().size() << "\t" << v2s(info.weights_.HostVector()) << std::endl
+         << "\tbase_margin_\t" << info.base_margin_.HostVector().size() << "\t" << v2s(info.base_margin_.HostVector()) << std::endl
+         << "\tlabels_lower_bound_\t" << info.labels_lower_bound_.HostVector().size() << "\t" << v2s(info.labels_lower_bound_.HostVector()) << std::endl
+         << "\tlabels_upper_bound_\t" << info.labels_upper_bound_.HostVector().size() << "\t" << v2s(info.labels_upper_bound_.HostVector()) << std::endl
+         << std::endl;
+
+    std::cerr << "SparsePage:" << std::endl
+         << "\toffset\t" << spage.offset.HostVector().size() << "\t" << v2s(spage.offset.HostVector()) << std::endl
+         << "\tdata\t" << spage.data.HostVector().size() << "\t";
+
+    const std::vector<xgboost::Entry>& v = spage.data.HostVector();
+    for (auto it=v.cbegin(); it!=v.cend(); ++it) {
+        std::cerr << it->index << ":" << it->fvalue << ",";
+    }
+    std::cerr << std::endl << std::endl;
+}
+
 int SampleVec2SimpleDMatrix(const sample_vec_t& svec, xgboost::data::SimpleDMatrix& sdmtx, int n_col) {
+
+    std::cerr << "SampleVec2SimpleDMatrix(,," << n_col << ")" << std::endl;
 
     int non_zero_cnt = 0;
     std::vector<xgboost::bst_row_t> offset_vec;
@@ -60,7 +102,7 @@ int SampleVec2SimpleDMatrix(const sample_vec_t& svec, xgboost::data::SimpleDMatr
     info.num_col_ = n_col;
     info.num_nonzero_ = non_zero_cnt;
     info.labels_ = xgboost::HostDeviceVector<xgboost::bst_float>(labels_vec);
-    info.weights_ = xgboost::HostDeviceVector<xgboost::bst_float>(weights_vec);
+    //info.weights_ = xgboost::HostDeviceVector<xgboost::bst_float>(weights_vec);   //todo
 
     sdmtx.SetMetaInfo(info);
 
@@ -77,6 +119,10 @@ int XGB::Train(const dce_lab::sample_vec_t &train, const dce_lab::sample_vec_t &
 
     xgboost::data::SimpleDMatrix dtest;
     SampleVec2SimpleDMatrix(test, dtest, n_col_);
+
+    // todo
+    std::cerr << "Test dtest: " << std::endl;
+    TestDMatrix(dtest);
 
     DMatrixHandle eval_dmats[2] = {&dtrain, &dtest};
 
