@@ -35,6 +35,13 @@ public:
     XGB(int n_col) : n_col_(n_col) {}
     ~XGB();
 
+    /**
+     *
+     * @param train
+     * @param test
+     * @param param_dict    https://xgboost.readthedocs.io/en/latest/parameter.html
+     * @return
+     */
     int Train(const sample_vec_t& train, const sample_vec_t& test, const param_dic_t& param_dict);
 
     int Predict(const sample_vec_t& test, pred_res_t& result) const;
