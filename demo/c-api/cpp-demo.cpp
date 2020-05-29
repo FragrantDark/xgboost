@@ -76,6 +76,20 @@ int main(int argc, char** argv) {
     xgb.Predict(test, result);
 
     int n_print = 10;
+
+    cerr << "Pred result:" << endl;
+    for (int i=0; i< n_print; ++i) {
+        cout << "[" << i << "]\t" << test[i].label << "\t" << result[i] << endl;
+    }
+
+    const char* model_file = "xgb.model";
+    xgb.Save(model_file);
+
+    XGB xgb2(127);
+    xgb2.Load(model_file, test);
+    xgb2.Predict(test, result);
+
+    cerr << "Pred2 result:" << endl;
     for (int i=0; i< n_print; ++i) {
         cout << "[" << i << "]\t" << test[i].label << "\t" << result[i] << endl;
     }

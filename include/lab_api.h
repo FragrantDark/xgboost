@@ -41,7 +41,7 @@ public:
 
     int Save(const char* fname) const;
 
-    int Load(const char* fname);
+    int Load(const char* fname, const sample_vec_t& samples);
 
 private:
     BoosterHandle booster;

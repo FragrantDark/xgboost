@@ -187,7 +187,17 @@ int XGB::Save(const char *fname) const {
     return 0;
 }
 
-int XGB::Load(const char *fname) {
+int XGB::Load(const char *fname, const sample_vec_t& samples) {
+
+    xgboost::data::SimpleDMatrix samples_dmtx;
+    SampleVec2SimpleDMatrix(samples, samples_dmtx, n_col_);
+
+    DMatrixHandle dmtx = new std::shared_ptr<xgboost::DMatrix>(&samples_dmtx);
+
+    DMatrixHandle eval_dmats[2] = {dmtx, dmtx};
+
+    safe_xgboost(XGBoosterCreate(eval_dmats, 2, &booster));
+
     safe_xgboost(XGBoosterLoadModel(booster, fname));
 
     return 0;
