@@ -166,6 +166,13 @@ int XGB::Train(const dce_lab::sample_vec_t& train, const dce_lab::sample_vec_t& 
     return 0;
 }
 
+int XGB::Train(const dce_lab::dataset_t &pos_train, const dce_lab::dataset_t &neg_train,
+               const dce_lab::dataset_t &pos_test, const dce_lab::dataset_t &neg_test,
+               const dce_lab::param_dic_t &param_dict, const dce_lab::param_dic_t &my_param) {
+    //todo
+    return 0;
+}
+
 int XGB::Predict(const dce_lab::sample_vec_t &test, dce_lab::pred_res_t &result) const {
 
 
@@ -184,6 +191,12 @@ int XGB::Predict(const dce_lab::sample_vec_t &test, dce_lab::pred_res_t &result)
         result.emplace_back(out_result[i]);
     }
 
+    return 0;
+}
+
+int XGB::Predict(const dce_lab::dataset_t &pos_test, const dce_lab::dataset_t &neg_test, dce_lab::pred_res_t &pos_res,
+                 dce_lab::pred_res_t &neg_res) {
+    //todo
     return 0;
 }
 
