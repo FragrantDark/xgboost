@@ -124,8 +124,8 @@ int SampleVec2SimpleDMatrix(const sample_vec_t& svec, xgboost::data::SimpleDMatr
 
 XGB::~XGB() { safe_xgboost(XGBoosterFree(booster)); }
 
-int XGB::Train(const dce_lab::sample_vec_t &train, const dce_lab::sample_vec_t &test,
-               const dce_lab::param_dic_t &param_dict) {
+int XGB::Train(const dce_lab::sample_vec_t& train, const dce_lab::sample_vec_t& test,
+               const dce_lab::param_dic_t& param_dict, const dce_lab::param_dic_t& my_param) {
 
     xgboost::data::SimpleDMatrix dtrain;
     SampleVec2SimpleDMatrix(train, dtrain, n_col_);
@@ -145,9 +145,15 @@ int XGB::Train(const dce_lab::sample_vec_t &train, const dce_lab::sample_vec_t &
         safe_xgboost(XGBoosterSetParam(booster, it->first.c_str(), it->second.c_str()));
     }
 
-    // train and evaluate for 10 iters
-    // todo
+    // train and evaluate for X iters (default 10)
     int n_trees = 10;
+    auto mp_it = my_param.find("train_iteration");
+    if (mp_it != my_param.end()) {
+        std::stringstream mp_ss;
+        mp_ss << mp_it->second;
+        mp_ss >> n_trees;
+    }
+
     const char* eval_names[2] = {"train", "test"};
     const char* eval_result = NULL;
     for (int i = 0; i < n_trees; ++i) {

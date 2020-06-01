@@ -40,9 +40,11 @@ public:
      * @param train
      * @param test
      * @param param_dict    https://xgboost.readthedocs.io/en/latest/parameter.html
+     * @param my_param  train_iteration
      * @return
      */
-    int Train(const sample_vec_t& train, const sample_vec_t& test, const param_dic_t& param_dict);
+    int Train(const sample_vec_t& train, const sample_vec_t& test,
+            const param_dic_t& param_dict, const dce_lab::param_dic_t& my_param);
 
     int Predict(const sample_vec_t& test, pred_res_t& result) const;
 

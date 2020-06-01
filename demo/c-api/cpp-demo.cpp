@@ -69,8 +69,11 @@ int main(int argc, char** argv) {
     pdic["max_depth"] = "3";
     pdic["verbosity"] = "0";
 
+    unordered_map<string, string> mdic;
+    mdic["train_iteration"] = "5";
+
     XGB xgb(127);
-    xgb.Train(train, test, pdic);
+    xgb.Train(train, test, pdic, mdic);
 
     pred_res_t result;
     xgb.Predict(test, result);
