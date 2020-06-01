@@ -205,6 +205,9 @@ int XGB::Train(const dce_lab::sample_vec_t& train, const dce_lab::sample_vec_t& 
     xgboost::data::SimpleDMatrix dtest;
     SampleVec2SimpleDMatrix(test, dtest, n_col_);
 
+    // todo
+    TestDMatrix(dtest);
+
     DMatrixHandle dtrain1 = new std::shared_ptr<xgboost::DMatrix>(&dtrain);
     DMatrixHandle dtest1 = new std::shared_ptr<xgboost::DMatrix>(&dtest);
 
@@ -220,6 +223,9 @@ int XGB::Train(const dce_lab::dataset_t &pos_train, const dce_lab::dataset_t &ne
 
     xgboost::data::SimpleDMatrix dtest;
     Dataset2SimpleDMatrix(pos_test, neg_test, dtest, n_col_);
+
+    // todo
+    TestDMatrix(dtest);
 
     DMatrixHandle dtrain1 = new std::shared_ptr<xgboost::DMatrix>(&dtrain);
     DMatrixHandle dtest1 = new std::shared_ptr<xgboost::DMatrix>(&dtest);
