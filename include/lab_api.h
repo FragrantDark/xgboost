@@ -43,9 +43,12 @@ public:
      * @param train
      * @param test
      * @param param_dict    https://xgboost.readthedocs.io/en/latest/parameter.html
-     * @param my_param  train_iteration
+     * @param my_param      "train_iteration": default="10"
      * @return
      */
+    int Train(const DMatrixHandle dtrain, const DMatrixHandle dtest,
+              const param_dic_t& param_dict, const dce_lab::param_dic_t& my_param);
+
     int Train(const sample_vec_t& train, const sample_vec_t& test,
             const param_dic_t& param_dict, const dce_lab::param_dic_t& my_param);
 
@@ -53,9 +56,11 @@ public:
             const dataset_t& pos_test, const dataset_t& neg_test,
             const param_dic_t& param_dict, const dce_lab::param_dic_t& my_param);
 
+    int Predict(const DMatrixHandle dtest, pred_res_t& result) const;
+
     int Predict(const sample_vec_t& test, pred_res_t& result) const;
 
-    int Predict(const dataset_t& pos_test, const dataset_t& neg_test, pred_res_t& pos_res, pred_res_t& neg_res);
+    int Predict(const dataset_t& pos_test, const dataset_t& neg_test, pred_res_t& result);
 
     int Save(const char* fname) const;
 

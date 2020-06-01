@@ -79,6 +79,33 @@ void TestDMatrix(DMatrixHandle dmtx) {
     TestDMatrix(info, spage);
 }
 
+int GenSimpleDMatrix(xgboost::data::SimpleDMatrix& sdmtx, int n_col, int non_zero_cnt,
+        const std::vector<xgboost::bst_row_t>& offset_vec, const std::vector<xgboost::Entry>& data_vec,
+        const std::vector<xgboost::bst_float>& labels_vec, const std::vector<xgboost::bst_float>& weights_vec) {
+
+    // 1. SparsePage
+    xgboost::SparsePage page;
+
+    page.offset = xgboost::HostDeviceVector<xgboost::bst_row_t>(offset_vec);
+    page.data = xgboost::HostDeviceVector<xgboost::Entry>(data_vec);
+    page.base_rowid = 0;
+
+    sdmtx.SetSparsePage((xgboost::SparsePage&&)page);
+
+    // 2. MetaInfo
+    xgboost::MetaInfo info;
+
+    info.num_row_ = labels_vec.size();
+    info.num_col_ = n_col;
+    info.num_nonzero_ = non_zero_cnt;
+    info.labels_ = xgboost::HostDeviceVector<xgboost::bst_float>(labels_vec);
+    info.weights_ = xgboost::HostDeviceVector<xgboost::bst_float>(weights_vec);
+
+    sdmtx.SetMetaInfo(info);
+
+    return 0;
+}
+
 int SampleVec2SimpleDMatrix(const sample_vec_t& svec, xgboost::data::SimpleDMatrix& sdmtx, int n_col) {
 
     int non_zero_cnt = 0;
@@ -99,44 +126,48 @@ int SampleVec2SimpleDMatrix(const sample_vec_t& svec, xgboost::data::SimpleDMatr
         offset_vec.emplace_back(data_vec.size());
     }
 
-    // 1. SparsePage
-    xgboost::SparsePage page;
+    return GenSimpleDMatrix(sdmtx, n_col, non_zero_cnt, offset_vec, data_vec, labels_vec, weights_vec);
+}
 
-    page.offset = xgboost::HostDeviceVector<xgboost::bst_row_t>(offset_vec);
-    page.data = xgboost::HostDeviceVector<xgboost::Entry>(data_vec);
-    page.base_rowid = 0;
+void UpdateVectors(dataset_t::const_iterator& wlp, std::vector<xgboost::bst_float>& weights_vec, int& non_zero_cnt,
+                   std::vector<xgboost::Entry>& data_vec, std::vector<xgboost::bst_row_t>& offset_vec) {
 
-    sdmtx.SetSparsePage((xgboost::SparsePage&&)page);
+    weights_vec.emplace_back(wlp->first);
 
-    // 2. MetaInfo
-    xgboost::MetaInfo info;
+    for (auto ety=wlp->second.cbegin(); ety!=wlp->second.cend(); ++ety) {
+        non_zero_cnt += 1;
+        data_vec.emplace_back(ety->first, ety->second);
+    }
+    offset_vec.emplace_back(data_vec.size());
+}
 
-    info.num_row_ = svec.size();
-    info.num_col_ = n_col;
-    info.num_nonzero_ = non_zero_cnt;
-    info.labels_ = xgboost::HostDeviceVector<xgboost::bst_float>(labels_vec);
-    info.weights_ = xgboost::HostDeviceVector<xgboost::bst_float>(weights_vec);
+int Dataset2SimpleDMatrix(const dce_lab::dataset_t& pos, const dce_lab::dataset_t& neg,
+                          xgboost::data::SimpleDMatrix& sdmtx, int n_col) {
+    int non_zero_cnt = 0;
+    std::vector<xgboost::bst_row_t> offset_vec;
+    std::vector<xgboost::Entry> data_vec;
+    std::vector<xgboost::bst_float> labels_vec;
+    std::vector<xgboost::bst_float> weights_vec;
 
-    sdmtx.SetMetaInfo(info);
+    offset_vec.push_back(0);
+    for (auto wlp=pos.cbegin(); wlp!=pos.cend(); ++wlp) {
+        labels_vec.emplace_back(1);
+        UpdateVectors(wlp, weights_vec, non_zero_cnt, data_vec, offset_vec);
+    }
+    for (auto wlp=neg.cbegin(); wlp!=neg.cend(); ++wlp) {
+        labels_vec.emplace_back(0);
+        UpdateVectors(wlp, weights_vec, non_zero_cnt, data_vec, offset_vec);
+    }
 
-    return 0;
+    return GenSimpleDMatrix(sdmtx, n_col, non_zero_cnt, offset_vec, data_vec, labels_vec, weights_vec);
 }
 
 XGB::~XGB() { safe_xgboost(XGBoosterFree(booster)); }
 
-int XGB::Train(const dce_lab::sample_vec_t& train, const dce_lab::sample_vec_t& test,
-               const dce_lab::param_dic_t& param_dict, const dce_lab::param_dic_t& my_param) {
+int XGB::Train(const DMatrixHandle dtrain, const DMatrixHandle dtest, const dce_lab::param_dic_t &param_dict,
+               const dce_lab::param_dic_t &my_param) {
 
-    xgboost::data::SimpleDMatrix dtrain;
-    SampleVec2SimpleDMatrix(train, dtrain, n_col_);
-
-    xgboost::data::SimpleDMatrix dtest;
-    SampleVec2SimpleDMatrix(test, dtest, n_col_);
-
-    DMatrixHandle dtrain1 = new std::shared_ptr<xgboost::DMatrix>(&dtrain);
-    DMatrixHandle dtest1 = new std::shared_ptr<xgboost::DMatrix>(&dtest);
-
-    DMatrixHandle eval_dmats[2] = {dtrain1, dtest1};
+    DMatrixHandle eval_dmats[2] = {dtrain, dtest};
 
     safe_xgboost(XGBoosterCreate(eval_dmats, 2, &booster));
 
@@ -157,8 +188,7 @@ int XGB::Train(const dce_lab::sample_vec_t& train, const dce_lab::sample_vec_t& 
     const char* eval_names[2] = {"train", "test"};
     const char* eval_result = NULL;
     for (int i = 0; i < n_trees; ++i) {
-        //safe_xgboost(XGBoosterUpdateOneIter(booster, i, &dtrain));
-        safe_xgboost(XGBoosterUpdateOneIter(booster, i, dtrain1));
+        safe_xgboost(XGBoosterUpdateOneIter(booster, i, dtrain));
         safe_xgboost(XGBoosterEvalOneIter(booster, i, eval_dmats, eval_names, 2, &eval_result));
         printf("%s\n", eval_result);
     }
@@ -166,25 +196,43 @@ int XGB::Train(const dce_lab::sample_vec_t& train, const dce_lab::sample_vec_t& 
     return 0;
 }
 
-int XGB::Train(const dce_lab::dataset_t &pos_train, const dce_lab::dataset_t &neg_train,
-               const dce_lab::dataset_t &pos_test, const dce_lab::dataset_t &neg_test,
-               const dce_lab::param_dic_t &param_dict, const dce_lab::param_dic_t &my_param) {
-    //todo
-    return 0;
-}
+int XGB::Train(const dce_lab::sample_vec_t& train, const dce_lab::sample_vec_t& test,
+               const dce_lab::param_dic_t& param_dict, const dce_lab::param_dic_t& my_param) {
 
-int XGB::Predict(const dce_lab::sample_vec_t &test, dce_lab::pred_res_t &result) const {
-
-
-    bst_ulong out_len = 0;
-    const float* out_result = NULL;
+    xgboost::data::SimpleDMatrix dtrain;
+    SampleVec2SimpleDMatrix(train, dtrain, n_col_);
 
     xgboost::data::SimpleDMatrix dtest;
     SampleVec2SimpleDMatrix(test, dtest, n_col_);
 
+    DMatrixHandle dtrain1 = new std::shared_ptr<xgboost::DMatrix>(&dtrain);
     DMatrixHandle dtest1 = new std::shared_ptr<xgboost::DMatrix>(&dtest);
 
-    safe_xgboost(XGBoosterPredict(booster, dtest1, 0, 0, 0, &out_len, &out_result));
+    return Train(dtrain1, dtest1, param_dict, my_param);
+}
+
+int XGB::Train(const dce_lab::dataset_t &pos_train, const dce_lab::dataset_t &neg_train,
+               const dce_lab::dataset_t &pos_test, const dce_lab::dataset_t &neg_test,
+               const dce_lab::param_dic_t &param_dict, const dce_lab::param_dic_t &my_param) {
+
+    xgboost::data::SimpleDMatrix dtrain;
+    Dataset2SimpleDMatrix(pos_train, neg_train, dtrain, n_col_);
+
+    xgboost::data::SimpleDMatrix dtest;
+    Dataset2SimpleDMatrix(pos_test, neg_test, dtest, n_col_);
+
+    DMatrixHandle dtrain1 = new std::shared_ptr<xgboost::DMatrix>(&dtrain);
+    DMatrixHandle dtest1 = new std::shared_ptr<xgboost::DMatrix>(&dtest);
+
+    return Train(dtrain1, dtest1, param_dict, my_param);
+}
+
+int XGB::Predict(const DMatrixHandle dtest, dce_lab::pred_res_t &result) const {
+
+    bst_ulong out_len = 0;
+    const float* out_result = NULL;
+
+    safe_xgboost(XGBoosterPredict(booster, dtest, 0, 0, 0, &out_len, &out_result));
 
     result.clear();
     for (int i=0; i<out_len; ++i) {
@@ -194,10 +242,24 @@ int XGB::Predict(const dce_lab::sample_vec_t &test, dce_lab::pred_res_t &result)
     return 0;
 }
 
-int XGB::Predict(const dce_lab::dataset_t &pos_test, const dce_lab::dataset_t &neg_test, dce_lab::pred_res_t &pos_res,
-                 dce_lab::pred_res_t &neg_res) {
-    //todo
-    return 0;
+int XGB::Predict(const dce_lab::sample_vec_t &test, dce_lab::pred_res_t &result) const {
+
+    xgboost::data::SimpleDMatrix dtest;
+    SampleVec2SimpleDMatrix(test, dtest, n_col_);
+
+    DMatrixHandle dtest1 = new std::shared_ptr<xgboost::DMatrix>(&dtest);
+
+    return Predict(dtest1, result);
+}
+
+int XGB::Predict(const dce_lab::dataset_t &pos_test, const dce_lab::dataset_t &neg_test, dce_lab::pred_res_t &result) {
+
+    xgboost::data::SimpleDMatrix dtest;
+    Dataset2SimpleDMatrix(pos_test, neg_test, dtest, n_col_);
+
+    DMatrixHandle dtest1 = new std::shared_ptr<xgboost::DMatrix>(&dtest);
+
+    return Predict(dtest1, result);
 }
 
 int XGB::Save(const char *fname) const {
