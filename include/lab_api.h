@@ -43,7 +43,7 @@ public:
      * @param train
      * @param test
      * @param param_dict    https://xgboost.readthedocs.io/en/latest/parameter.html
-     * @param my_param      "train_iteration": default="10"
+     * @param my_param      "train_iteration": default="10", "model_file": default=""
      * @return
      */
     int Train(const DMatrixHandle dtrain, const DMatrixHandle dtest,

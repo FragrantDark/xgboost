@@ -185,12 +185,36 @@ int XGB::Train(const DMatrixHandle dtrain, const DMatrixHandle dtest, const dce_
         mp_ss >> n_trees;
     }
 
+    const char* model_file = nullptr;
+    mp_it = my_param.find("model_file");
+    if (mp_it != my_param.end()) {
+        model_file = mp_it->second.c_str();
+        std::cerr << "model_file = " << model_file << std::endl;
+    }
+
     const char* eval_names[2] = {"train", "test"};
     const char* eval_result = NULL;
+    float global_min_err = 1e10;
     for (int i = 0; i < n_trees; ++i) {
         safe_xgboost(XGBoosterUpdateOneIter(booster, i, dtrain));
         safe_xgboost(XGBoosterEvalOneIter(booster, i, eval_dmats, eval_names, 2, &eval_result));
+
         printf("%s\n", eval_result);
+
+        std::string ers(eval_result);
+        int bpos = ers.find_last_of(':');
+        std::stringstream ess;
+        ess << ers.substr(bpos + 1);
+        float err;
+        ess >> err;
+
+        //std::cerr << "err = " << err << ", should be " << ers.substr(bpos) << std::endl;
+
+        if (err < global_min_err) {
+            global_min_err = err;
+            std::cerr << "Save to model_file" << std::endl;
+            if (model_file != nullptr) Save(model_file);
+        }
     }
 
     return 0;

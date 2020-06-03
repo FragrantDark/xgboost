@@ -124,7 +124,8 @@ int main(int argc, char** argv) {
     pdic["verbosity"] = "0";
 
     unordered_map<string, string> mdic;
-    mdic["train_iteration"] = "5";
+    mdic["train_iteration"] = "50";
+    mdic["model_file"] = "xgb.model.1";
 
     XGB xgb(127);
     xgb.Train(train, test, pdic, mdic);
